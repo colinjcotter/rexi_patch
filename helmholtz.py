@@ -14,6 +14,7 @@ u, p = TrialFunctions(W)
 v, q = TestFunctions(W)
 
 x, y = SpatialCoordinate(mesh)
+f = exp(cos(pi*x)*cos(pi*y))
 
 ur = u[0,:]
 ui = u[1,:]
@@ -30,9 +31,7 @@ L_bit = (- div(vr)*pr + div(ur)*qr
          - div(vi)*pi + div(ui)*qi)*dx
 
 eqn = identity_bit + L_bit
-rhs = inner(vr, as_vector([exp(cos(pi*x)*cos(pi*y)), 0.]))*dx
-
-print(len(rhs.arguments()), 'args')
+rhs = qr*f*dx
 
 w = Function(W)
 
