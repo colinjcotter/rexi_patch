@@ -1,12 +1,13 @@
 from firedrake import *
+
 nref = 4
 base = UnitSquareMesh(4, 4)
 mh = MeshHierarchy(base,nref)
 mesh = mh[-1]
 
 degree = 1
-V = FunctionSpace(mesh, "BDM", degree)
-Q = FunctionSpace(mesh, "DG", degree-1)
+V = VectorFunctionSpace(mesh, "BDM", degree)
+Q = VectorFunctionSpace(mesh, "DG", degree-1)
 W = V * Q
 
 u, p = TrialFunctions(W)
@@ -14,10 +15,24 @@ v, q = TestFunctions(W)
 
 x, y = SpatialCoordinate(mesh)
 
-eqn = inner(u,v)*dx - div(v)*p*dx + p*q*dx + div(u)*q*dx
-L = q*exp(cos(pi*x)*cos(pi*y))*dx
+ur = u[0,:]
+ui = u[1,:]
+vr = v[0,:]
+vi = v[1,:]
+pr = p[0]
+pi = p[1]
+qr = q[0]
+qi = q[1]
 
-bcs = [DirichletBC(W.sub(0), as_vector((0.,0.0)), "on_boundary")]
+identity_bit = (inner(ur, vr) + inner(ui, vi)
+                + pr*qr + pi*qi)*dx
+L_bit = (- div(vr)*pr + div(ur)*qr
+         - div(vi)*pi + div(ui)*qi)*dx
+
+eqn = identity_bit + L_bit
+rhs = inner(vr, as_vector([exp(cos(pi*x)*cos(pi*y)), 0.]))*dx
+
+print(len(rhs.arguments()), 'args')
 
 w = Function(W)
 
@@ -60,6 +75,11 @@ mg_params = {
     "mg_coarse_assembled_pc_factor_mat_solver_type": "mumps"
 }
 
-hprob = LinearVariationalProblem(eqn, L, w, bcs=bcs)
+zs = Constant(0.)
+zv = as_tensor([[zs, zs], [zs, zs]])
+
+bcs = [DirichletBC(W.sub(0), zv, "on_boundary")]
+
+hprob = LinearVariationalProblem(eqn, rhs, w, bcs=bcs)
 hsolver = LinearVariationalSolver(hprob, solver_parameters=mg_params)
 hsolver.solve()
